@@ -1,6 +1,6 @@
 
 run:
-	cargo run -- -c 3 -n 2
+	cargo run -- -c 3 -n 2 http://localhost:8000/h
 
 build:
 	cargo build --release

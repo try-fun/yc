@@ -1,11 +1,9 @@
 use std::error::Error;
 use std::result::Result;
-use yc::client;
-use yc::libs::args::Args;
+use yc::tester;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let args = Args::new().parse();
-    client::run(args).await;
+    tester::run(100, 10, "http://localhost:8000/h").await;
     Ok(())
 }
