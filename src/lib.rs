@@ -23,7 +23,7 @@ pub mod tester {
         let (tx, rx) = mpsc::channel(1);
 
         // 统计输出
-        task::spawn(async move {
+        let t1 = task::spawn(async move {
             format(n, c, rx).await;
         });
 
@@ -64,6 +64,8 @@ pub mod tester {
             })
             .await;
         drop(tx);
+
+        if let Ok(_) = t1.await {}
     }
 
     pub async fn format(n: usize, c: usize, mut rx: mpsc::Receiver<(u32, u128, usize)>) {
@@ -103,7 +105,7 @@ pub mod tester {
             println!("耗时: {} ms", (stop - start).as_millis());
         };
         println!(
-            "请求数/秒: {:.4} 次",
+            "请求数/秒: {:.2} 次",
             sent_total as f64 / if min == 0 { 1 } else { min } as f64
         );
         println!("成功数: {}", ok_count);
