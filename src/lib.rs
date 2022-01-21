@@ -1,3 +1,5 @@
+pub mod libs;
+
 pub mod tester {
 
     use futures::{stream, StreamExt};
@@ -29,15 +31,14 @@ pub mod tester {
         let client = Client::new();
         let reqs = vec![url; n];
         let tasks = stream::iter(reqs)
-            .enumerate()
-            .map(|(i, url)| {
+            .map(|url| {
                 let client = &client;
                 async move {
                     let resp = client.get(url).send().await?;
                     let status = resp.status();
                     resp.bytes()
                         .await
-                        .map(|byte| (i, time::Instant::now(), status, byte))
+                        .map(|byte| (time::Instant::now(), status, byte))
                 }
             })
             .buffer_unordered(c);
@@ -49,9 +50,9 @@ pub mod tester {
                 let stop = time::Instant::now();
                 match x {
                     Ok(x) => match x {
-                        (id, start, status, x) => {
+                        (start, status, x) => {
                             if let Err(e) = tx
-                                .send((id, start, stop, 200, x.len(), status.to_string()))
+                                .send((200, start, stop, x.len(), status.to_string()))
                                 .await
                             {
                                 panic!("{}", e)
@@ -61,10 +62,9 @@ pub mod tester {
                     _ => {
                         if let Err(e) = tx
                             .send((
-                                0,
-                                stop,
-                                stop,
                                 500,
+                                stop,
+                                stop,
                                 0,
                                 reqwest::StatusCode::SERVICE_UNAVAILABLE.to_string(),
                             ))
@@ -84,7 +84,7 @@ pub mod tester {
 
     pub async fn format(
         n: usize,
-        mut rx: mpsc::Receiver<(usize, time::Instant, time::Instant, u32, usize, String)>,
+        mut rx: mpsc::Receiver<(u32, time::Instant, time::Instant, usize, String)>,
     ) {
         let vec: Vec<u128> = Vec::with_capacity(10);
         let tuple = Arc::new(Mutex::new((0, 0, 0, 0, 0, 0, 0, String::from(""), vec)));
@@ -123,7 +123,7 @@ pub mod tester {
                     let avg = sum / if t.8.len() == 0 { 1 } else { t.8.len() } as u128;
 
                     println!(
-                        "{0:>4}s│{1:>7}│{2:>7}│{3:>7.1}│{4:>8}│{5:>8}│{6:>8}│{7:>8}│{8:>8.2}│{9:<8}",
+                        "{0:>4}s│{1:>7}│{2:>7}│{3:>7.1}│{4:>8}│{5:>8}│{6:>8}│{7:>10}│{8:>10.2}│{9:<8}",
                         secs, t.0, t.1, qps, max, min, avg, t.6, bytes_per, t.7,
                     );
 
@@ -135,17 +135,18 @@ pub mod tester {
         }
 
         while let Some(x) = rx.recv().await {
-            let mut t = tuple.lock().unwrap();
-            if x.3 == 200 {
+            let mut t = tuple.try_lock().unwrap();
+            //TODO:poisoned lock: another task failed inside
+            t.8.push(x.1.elapsed().as_micros() - x.2.elapsed().as_micros());
+            if x.0 == 200 {
                 t.0 += 1; //成功数
-                t.8.push(x.1.elapsed().as_micros() - x.2.elapsed().as_micros());
             } else {
                 t.1 += 1; //失败数
             }
 
             // id, start, stop, 200, x.len(), status.to_string()
-            t.6 += x.4 as u64; //body长度
-            t.7 = x.5; //状态码
+            t.6 += x.3 as u64; //body长度
+            t.7 = x.4; //状态码
         }
     }
 
@@ -153,13 +154,13 @@ pub mod tester {
         println!();
         // 打印的时长都为毫秒 总请数
         println!(
-            "─────┬───────┬───────┬───────┬────────┬────────┬────────┬────────┬────────┬────────"
+            "─────┬───────┬───────┬───────┬────────┬────────┬────────┬──────────┬──────────┬────────"
         );
         println!(
-            " 耗时│ 成功数│ 失败数│  qps  │最长耗时│最短耗时│平均耗时│下载字节│字节每秒│ 状态码"
+            " 耗时│ 成功数│ 失败数│  qps  │最长耗时│最短耗时│平均耗时│ 下载字节 │ 字节每秒 │ 状态码"
         );
         println!(
-            "─────┼───────┼───────┼───────┼────────┼────────┼────────┼────────┼────────┼────────"
+            "─────┼───────┼───────┼───────┼────────┼────────┼────────┼──────────┼──────────┼────────"
         );
         return;
     }

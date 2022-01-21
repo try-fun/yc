@@ -1,14 +1,12 @@
 use std::error::Error;
 use std::result::Result;
+use yc::libs::args::Args;
 use yc::tester;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // let mut v = Vec::new();
-    // let u1 = 0u128;
-    // let u2 = 0u128;
-    // v.push(u1 - u2);
-    // println!("{}", u1 - u2);
-    tester::run(10, 1, "http://localhost:8000/h").await;
+    let args = Args::new().parse();
+    let url: &str = &args.url.clone()[..];
+    tester::run(args.n as usize, args.c as usize, url).await;
     Ok(())
 }
