@@ -1,5 +1,5 @@
+use reqwest::Url;
 use std::env;
-
 pub struct Args {
     // 请求次数
     pub n: u32,
@@ -31,7 +31,11 @@ impl Args {
                     self.n = args[i].parse::<u32>().unwrap();
                 }
                 _ => {
-                    self.url = args[i].to_string();
+                    let url = match Url::parse(&args[i]) {
+                        Ok(x) => x.to_string(),
+                        Err(_) => "".to_string(),
+                    };
+                    self.url = url;
                 }
             };
         }
