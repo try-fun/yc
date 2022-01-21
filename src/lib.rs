@@ -2,10 +2,10 @@ pub mod libs;
 
 pub mod tester {
 
+    use crate::libs::tools::pretty;
     use futures::{stream, StreamExt};
+    use indicatif::ProgressBar;
     use reqwest::{Client, Url};
-    use std::sync::Arc;
-    use std::sync::Mutex;
     use std::time;
     use tokio::sync::mpsc;
     use tokio::task;
@@ -23,8 +23,8 @@ pub mod tester {
         let (tx, rx) = mpsc::channel(1);
 
         // 统计输出
-        let t1 = task::spawn(async move {
-            format(n, rx).await;
+        task::spawn(async move {
+            format(n, c, rx).await;
         });
 
         // 创建任务
@@ -36,10 +36,7 @@ pub mod tester {
                 async move {
                     let url = Url::parse(url).unwrap();
                     let resp = client.get(url).send().await?;
-                    let status = resp.status();
-                    resp.bytes()
-                        .await
-                        .map(|byte| (time::Instant::now(), status, byte))
+                    resp.bytes().await.map(|byte| (time::Instant::now(), byte))
                 }
             })
             .buffer_unordered(c);
@@ -51,26 +48,15 @@ pub mod tester {
                 let stop = time::Instant::now();
                 match x {
                     Ok(x) => match x {
-                        (start, status, x) => {
-                            if let Err(e) = tx
-                                .send((200, start, stop, x.len(), status.to_string()))
-                                .await
+                        (start, x) => {
+                            if let Err(e) = tx.send((200, (stop - start).as_nanos(), x.len())).await
                             {
                                 panic!("{}", e)
                             }
                         }
                     },
                     _ => {
-                        if let Err(e) = tx
-                            .send((
-                                500,
-                                stop,
-                                stop,
-                                0,
-                                reqwest::StatusCode::SERVICE_UNAVAILABLE.to_string(),
-                            ))
-                            .await
-                        {
+                        if let Err(e) = tx.send((500, 0u128, 0)).await {
                             panic!("{}", e);
                         }
                     }
@@ -78,91 +64,64 @@ pub mod tester {
             })
             .await;
         drop(tx);
-
-        // 等待任务结束
-        if let Ok(_) = t1.await {}
     }
 
-    pub async fn format(
-        n: usize,
-        mut rx: mpsc::Receiver<(u32, time::Instant, time::Instant, usize, String)>,
-    ) {
-        let vec: Vec<u128> = Vec::with_capacity(10);
-        let tuple = Arc::new(Mutex::new((0, 0, 0, 0, 0, 0, 0, String::from(""), vec)));
-        {
-            let tuple1 = tuple.clone();
-            let now = time::Instant::now(); //计时
-            task::spawn(async move {
-                print_header();
-                loop {
-                    std::thread::sleep(time::Duration::from_secs(1));
-                    let t = match tuple1.lock() {
-                        Ok(x) => x,
-                        Err(e) => panic!("{}", e),
-                    };
+    pub async fn format(n: usize, c: usize, mut rx: mpsc::Receiver<(u32, u128, usize)>) {
+        let mut ok_count = 0; //成功数
+        let mut failed_count = 0; //失败数
+        let mut data_len: usize = 0; //数据长度 bytes
+        let mut times: Vec<u128> = Vec::with_capacity(10);
+        let start = time::Instant::now(); //开始计时
 
-                    // 减去sleep的1秒
-                    let secs = now.elapsed().as_secs();
-                    let reqc = t.0 + t.1; //响应数量
-
-                    // QPS QPS = req/sec = 请求数/秒
-                    let qps = reqc as f64 / if secs <= 0 { 1 } else { secs } as f64;
-                    let bytes_per = t.6 as f64 / if secs <= 0 { 1 } else { secs } as f64;
-
-                    // 最长耗时
-                    let max = match t.8.iter().max() {
-                        Some(x) => x,
-                        _ => &0u128,
-                    };
-                    // 最短耗时
-                    let min = match t.8.iter().min() {
-                        Some(x) => x,
-                        _ => &0u128,
-                    };
-                    // 平均耗时
-                    let sum: u128 = t.8.iter().sum();
-                    let avg = sum / if t.8.len() == 0 { 1 } else { t.8.len() } as u128;
-
-                    println!(
-                        "{0:>4}s│{1:>7}│{2:>7}│{3:>7.1}│{4:>8}│{5:>8}│{6:>8}│{7:>10}│{8:>10.2}│{9:<8}",
-                        secs, t.0, t.1, qps, max, min, avg, t.6, bytes_per, t.7,
-                    );
-
-                    if n == reqc as usize {
-                        break;
-                    }
-                }
-            });
-        }
+        let pb = ProgressBar::new(n as u64); // 进度条
 
         while let Some(x) = rx.recv().await {
-            let mut t = tuple.try_lock().unwrap();
-            //TODO:poisoned lock: another task failed inside
-            t.8.push(x.1.elapsed().as_micros() - x.2.elapsed().as_micros());
             if x.0 == 200 {
-                t.0 += 1; //成功数
+                ok_count += 1;
             } else {
-                t.1 += 1; //失败数
+                failed_count += 1;
             }
 
-            // id, start, stop, 200, x.len(), status.to_string()
-            t.6 += x.3 as u64; //body长度
-            t.7 = x.4; //状态码
+            data_len += x.2; //数据 长度
+            times.push(x.1); //微秒
+            pb.inc(1); //显示进度
         }
-    }
+        pb.finish_with_message("finished!");
 
-    fn print_header() {
-        println!();
-        // 打印的时长都为毫秒 总请数
+        // 输出统计
+        let stop = time::Instant::now();
+        let sent_total = ok_count - failed_count;
+        let avg_time = (times.iter().sum::<u128>() / if n == 0 { 1 } else { n } as u128) as f32;
+        let avg_size = (data_len / if sent_total == 0 { 1 } else { sent_total }) as f64;
+        println!("并发数: {}", c);
+        println!("请求次数: {}", n);
+        if (stop - start).as_secs() > 0 {
+            println!("耗时: {} s", (stop - start).as_secs());
+        } else {
+            println!("耗时: {} ms", (stop - start).as_millis());
+        };
+
+        println!("请求数/秒: {} 次", n);
+        println!("成功数: {}", ok_count);
+        println!("失败数: {}", failed_count);
+        println!("丢失数: {}", n - sent_total);
+        println!("下载数据: {}", pretty::bytes(data_len as f64));
+        println!("数据/秒: {}", pretty::bytes(avg_size));
+
         println!(
-            "─────┬───────┬───────┬───────┬────────┬────────┬────────┬──────────┬──────────┬────────"
+            "最长时间: {} ns",
+            match times.iter().max() {
+                Some(x) => x,
+                _ => &0u128,
+            }
         );
         println!(
-            " 耗时│ 成功数│ 失败数│  qps  │最长耗时│最短耗时│平均耗时│ 下载字节 │ 字节每秒 │ 状态码"
+            "最短时间: {} ns",
+            match times.iter().min() {
+                Some(x) => x,
+                _ => &0u128,
+            }
         );
-        println!(
-            "─────┼───────┼───────┼───────┼────────┼────────┼────────┼──────────┼──────────┼────────"
-        );
-        return;
+        println!("平均时间: {} ns", avg_time);
     }
 }
