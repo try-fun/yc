@@ -54,12 +54,12 @@ pub mod tester {
                                 .send((id, start, stop, 200, x.len(), status.to_string()))
                                 .await
                             {
-                                println!("{}", e)
+                                panic!("{}", e)
                             }
                         }
                     },
                     _ => {
-                        if let Err(_) = tx
+                        if let Err(e) = tx
                             .send((
                                 0,
                                 stop,
@@ -70,7 +70,7 @@ pub mod tester {
                             ))
                             .await
                         {
-                            println!("message sent failed")
+                            panic!("{}", e);
                         }
                     }
                 }
@@ -86,24 +86,45 @@ pub mod tester {
         n: usize,
         mut rx: mpsc::Receiver<(usize, time::Instant, time::Instant, u32, usize, String)>,
     ) {
-        let tuple = Arc::new(Mutex::new((0, 0, 0, 0, 0, 0, 0, 0, "", "")));
+        let vec: Vec<u128> = Vec::with_capacity(10);
+        let tuple = Arc::new(Mutex::new((0, 0, 0, 0, 0, 0, 0, String::from(""), vec)));
         {
             let tuple1 = tuple.clone();
-            let now = time::Instant::now();
+            let now = time::Instant::now(); //计时
             task::spawn(async move {
                 print_header();
                 loop {
                     std::thread::sleep(time::Duration::from_secs(1));
-                    let t = tuple1.lock().unwrap();
+                    let t = match tuple1.lock() {
+                        Ok(x) => x,
+                        Err(e) => panic!("{}", e),
+                    };
 
+                    // 减去sleep的1秒
                     let secs = now.elapsed().as_secs();
-                    let reqc = t.0 + t.1;
+                    let reqc = t.0 + t.1; //响应数量
+
                     // QPS QPS = req/sec = 请求数/秒
-                    let qps = reqc / if secs <= 0 { 1 } else { secs };
+                    let qps = reqc as f64 / if secs <= 0 { 1 } else { secs } as f64;
+                    let bytes_per = t.6 as f64 / if secs <= 0 { 1 } else { secs } as f64;
+
+                    // 最长耗时
+                    let max = match t.8.iter().max() {
+                        Some(x) => x,
+                        _ => &0u128,
+                    };
+                    // 最短耗时
+                    let min = match t.8.iter().min() {
+                        Some(x) => x,
+                        _ => &0u128,
+                    };
+                    // 平均耗时
+                    let sum: u128 = t.8.iter().sum();
+                    let avg = sum / if t.8.len() == 0 { 1 } else { t.8.len() } as u128;
 
                     println!(
-                        "{0:<5}│{1:<7}│{2:<7}│{3:<7}│{4:<8}│{5:<8}│{6:<8}│{7:<8}│{8:<8}│{9:<8}",
-                        secs, t.0, t.1, qps, t.3, t.4, t.5, t.6, t.7, t.8,
+                        "{0:>4}s│{1:>7}│{2:>7}│{3:>7.1}│{4:>8}│{5:>8}│{6:>8}│{7:>8}│{8:>8.2}│{9:<8}",
+                        secs, t.0, t.1, qps, max, min, avg, t.6, bytes_per, t.7,
                     );
 
                     if n == reqc as usize {
@@ -116,10 +137,15 @@ pub mod tester {
         while let Some(x) = rx.recv().await {
             let mut t = tuple.lock().unwrap();
             if x.3 == 200 {
-                t.0 += 1;
+                t.0 += 1; //成功数
+                t.8.push(x.1.elapsed().as_micros() - x.2.elapsed().as_micros());
             } else {
-                t.1 += 1;
+                t.1 += 1; //失败数
             }
+
+            // id, start, stop, 200, x.len(), status.to_string()
+            t.6 += x.4 as u64; //body长度
+            t.7 = x.5; //状态码
         }
     }
 
