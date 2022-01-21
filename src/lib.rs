@@ -3,7 +3,7 @@ pub mod libs;
 pub mod tester {
 
     use futures::{stream, StreamExt};
-    use reqwest::Client;
+    use reqwest::{Client, Url};
     use std::sync::Arc;
     use std::sync::Mutex;
     use std::time;
@@ -34,6 +34,7 @@ pub mod tester {
             .map(|url| {
                 let client = &client;
                 async move {
+                    let url = Url::parse(url).unwrap();
                     let resp = client.get(url).send().await?;
                     let status = resp.status();
                     resp.bytes()
