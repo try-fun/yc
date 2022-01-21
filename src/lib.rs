@@ -67,12 +67,11 @@ pub mod tester {
     }
 
     pub async fn format(n: usize, c: usize, mut rx: mpsc::Receiver<(u32, u128, usize)>) {
+        let start = time::Instant::now(); //开始计时
         let mut ok_count = 0; //成功数
         let mut failed_count = 0; //失败数
         let mut data_len: usize = 0; //数据长度 bytes
         let mut times: Vec<u128> = Vec::with_capacity(10);
-        let start = time::Instant::now(); //开始计时
-
         let pb = ProgressBar::new(n as u64); // 进度条
 
         while let Some(x) = rx.recv().await {
@@ -90,18 +89,23 @@ pub mod tester {
 
         // 输出统计
         let stop = time::Instant::now();
+        let min = (stop - start).as_secs();
         let sent_total = ok_count - failed_count;
-        let avg_time = (times.iter().sum::<u128>() / if n == 0 { 1 } else { n } as u128) as f32;
+        let avg_time = (times.iter().sum::<u128>()
+            / if sent_total == 0 { 1 } else { sent_total } as u128) as f32;
         let avg_size = (data_len / if sent_total == 0 { 1 } else { sent_total }) as f64;
         println!("并发数: {}", c);
         println!("请求次数: {}", n);
-        if (stop - start).as_secs() > 0 {
-            println!("耗时: {} s", (stop - start).as_secs());
+
+        if min > 0 {
+            println!("耗时: {} s", min);
         } else {
             println!("耗时: {} ms", (stop - start).as_millis());
         };
-
-        println!("请求数/秒: {} 次", n);
+        println!(
+            "请求数/秒: {:.4} 次",
+            sent_total as f64 / if min == 0 { 1 } else { min } as f64
+        );
         println!("成功数: {}", ok_count);
         println!("失败数: {}", failed_count);
         println!("丢失数: {}", n - sent_total);
