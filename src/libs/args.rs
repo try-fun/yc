@@ -12,8 +12,8 @@ pub struct Args {
 impl Args {
     pub fn new() -> Self {
         Self {
-            c: 1,
-            n: 30,
+            c: 1,  //默认
+            n: 10, //默认
             url: String::from(""),
         }
     }
@@ -24,18 +24,37 @@ impl Args {
             match x {
                 "-c" | "-c=" => {
                     i += 1;
-                    self.c = args[i].parse::<u32>().unwrap();
+                    self.c = match args[i].parse::<u32>() {
+                        Ok(x) => x,
+                        Err(_) => panic!("-c need number"),
+                    }
                 }
                 "-n" | "-n=" => {
                     i += 1;
-                    self.n = args[i].parse::<u32>().unwrap();
+                    self.n = match args[i].parse::<u32>() {
+                        Ok(x) => x,
+                        Err(_) => panic!("-n need number"),
+                    }
                 }
                 _ => {
-                    let url = match Url::parse(&args[i]) {
-                        Ok(x) => x.to_string(),
-                        Err(_) => "".to_string(),
-                    };
-                    self.url = url;
+                    // 解析url
+                    if self.url == "" {
+                        self.url = if let Ok(x) = Url::parse(&args[i]) {
+                            let mut surl = String::from("");
+
+                            // 自动补充http头,如果缺失http://
+                            if x.as_str().contains("http") {
+                                surl.push_str(x.as_str())
+                            } else {
+                                surl.push_str("http://");
+                                surl.push_str(x.as_str());
+                            }
+
+                            surl
+                        } else {
+                            "".to_string()
+                        };
+                    }
                 }
             };
         }
