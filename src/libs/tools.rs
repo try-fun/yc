@@ -1,37 +1,36 @@
 pub mod pretty {
 
-    /// byte size for 1 byte
-    const B: f64 = 1.00;
-    /// bytes size for 1 kilobyte
-    const KB: f64 = 1_000.00;
-    /// bytes size for 1 megabyte
-    const MB: f64 = 1_000_000.00;
-    /// bytes size for 1 gigabyte
-    const GB: f64 = 1_000_000_000.00;
-    /// bytes size for 1 terabyte
-    const TB: f64 = 1_000_000_000_000.00;
-    /// bytes size for 1 petabyte
-    const PB: f64 = 1_000_000_000_000_000.00;
-
     pub fn bytes(size: f64) -> String {
-        if size <= B {
-            return format!("{:.2} Bytes", size);
+        let units = vec![
+            "Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "BB",
+        ];
+        let usize = 1024_f64;
+        let mut index = 0;
+        let mut k = size;
+
+        while k >= usize {
+            k = k / usize;
+            index += 1;
         }
-        if size > B && size <= KB {
-            return format!("{:.2} KB", size / B);
-        }
-        if size > KB && size <= MB {
-            return format!("{:.2} MB", size / KB);
-        }
-        if size > MB && size <= GB {
-            return format!("{:.2} GB", size / MB);
-        }
-        if size > GB && size <= TB {
-            return format!("{:.2} TB", size / GB);
-        }
-        if size > TB && size <= PB {
-            return format!("{:.2} PB", size / TB);
-        }
-        return format!("{:.2} Bytes", size);
+
+        return format!("{:.2} {}", k, units[index]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::pretty;
+
+    #[test]
+    fn it_works() {
+        assert_eq!("-1.00 Bytes", pretty::bytes(-1f64));
+        assert_eq!("0.00 Bytes", pretty::bytes(0f64));
+        assert_eq!("100.00 Bytes", pretty::bytes(100f64));
+        assert_eq!("1000.00 Bytes", pretty::bytes(1000f64));
+        assert_eq!("1.95 KB", pretty::bytes(2000f64));
+        assert_eq!("976.56 KB", pretty::bytes(1000000f64));
+        assert_eq!("9.54 MB", pretty::bytes(10000000f64));
+        assert_eq!("888.18 PB", pretty::bytes(1000000000000000000f64));
     }
 }

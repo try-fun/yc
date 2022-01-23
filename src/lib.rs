@@ -20,7 +20,7 @@ pub mod tester {
     */
     pub async fn run(n: usize, c: usize, url: &str) {
         // 初始化channle
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
 
         // 统计输出
         let u = url.to_string();
