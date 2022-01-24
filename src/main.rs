@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::result::Result;
 use yc::libs::args::Args;
-use yc::tester;
+use yc::tester::{comm, crazy};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -11,6 +11,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("need url");
         return Ok(());
     }
-    tester::run(args.n as usize, args.c as usize, url).await;
+
+    if args.t > 0 {
+        crazy::run(args.t as u64, url).await;
+    } else {
+        comm::run(args.n as usize, args.c as usize, url).await;
+    }
+
     Ok(())
 }

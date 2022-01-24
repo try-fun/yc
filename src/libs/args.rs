@@ -1,6 +1,8 @@
 use reqwest::Url;
 use std::env;
 pub struct Args {
+    // 时间秒
+    pub t: u32,
     // 请求次数
     pub n: u32,
     // 并发数量
@@ -12,6 +14,7 @@ pub struct Args {
 impl Args {
     pub fn new() -> Self {
         Self {
+            t: 0,
             c: 1,  //默认
             n: 10, //默认
             url: String::from(""),
@@ -34,6 +37,13 @@ impl Args {
                     self.n = match args[i].parse::<u32>() {
                         Ok(x) => x,
                         Err(_) => panic!("-n need number"),
+                    }
+                }
+                "-t" | "-t=" => {
+                    i += 1;
+                    self.t = match args[i].parse::<u32>() {
+                        Ok(x) => x,
+                        Err(_) => panic!("-t need number"),
                     }
                 }
                 _ => {
@@ -59,6 +69,7 @@ impl Args {
             };
         }
         Self {
+            t: self.t,
             c: self.c,
             n: self.n,
             url: self.url.clone(),
