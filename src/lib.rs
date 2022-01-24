@@ -109,14 +109,14 @@ pub mod tester {
         let avg_size = (data_len / if sent_total == 0 { 1 } else { sent_total }) as f64;
 
         println!();
-        if min > 0 {
-            println!("耗时: {} s", min);
+        if min > 0u64 {
+            println!("耗时: {:.2} s", min);
         } else {
             println!("耗时: {} ms", (stop - start).as_millis());
         };
         println!(
             "请求/秒: {:.2} 次",
-            sent_total as f64 / if min == 0 { 1 } else { min } as f64
+            sent_total as u64 / if min == 0u64 { 1u64 } else { min }
         );
 
         println!("成功: {}", ok_count);

@@ -1,6 +1,6 @@
 
 run:
-	cargo run -- -c 10 -n 100 http://localhost:8000/h
+	cargo run -- -c 2 -n 100 http://qq.com
 
 build:
 	cargo build --release
