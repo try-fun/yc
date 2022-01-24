@@ -27,6 +27,7 @@ pub async fn run(n: usize, c: usize, url: &str) {
     // 创建任务
     let client = Client::new();
     let reqs = vec![url; n];
+
     let tasks = stream::iter(reqs)
         .map(|url| {
             let client = &client;
@@ -102,11 +103,11 @@ pub async fn format(n: usize, c: usize, url: String, mut rx: mpsc::Receiver<(u32
     println!();
     if min > 0f64 {
         println!(
-            "耗时: {:.2} s",
+            "   耗时: {:.2} s",
             ((stop - start).as_micros() as f64 / 1000000f64)
         );
     } else {
-        println!("耗时: {} ms", (stop - start).as_millis());
+        println!("   耗时: {} ms", (stop - start).as_millis());
     };
     println!(
         "请求/秒: {:.2} 次/秒",

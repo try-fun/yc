@@ -20,13 +20,12 @@ pub async fn run(t: u64, url: &str) {
             break;
         }
 
-        let client = client.clone();
         let tx_x = tx.clone();
         let url = Url::parse(url).unwrap();
-
+        let response = client.get(url).send();
         tokio::spawn(async move {
             let start = time::Instant::now();
-            match client.get(url).send().await {
+            match response.await {
                 Ok(resp) => {
                     let body = resp.bytes().await;
                     match body {
@@ -93,11 +92,11 @@ pub async fn format(t: u64, url: String, mut rx: mpsc::Receiver<(u32, u128, usiz
     println!();
     if min > 0f64 {
         println!(
-            "耗时: {:.2} s",
+            "   耗时: {:.2} s",
             ((stop - start).as_micros() as f64 / 1000000f64)
         );
     } else {
-        println!("耗时: {} ms", (stop - start).as_millis());
+        println!("   耗时: {} ms", (stop - start).as_millis());
     };
     println!(
         "请求/秒: {:.2} 次/秒",
