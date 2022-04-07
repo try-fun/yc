@@ -1,6 +1,7 @@
 use reqwest::Url;
 use std::env;
 pub struct Args {
+    pub crazy: bool,
     // 时间秒
     pub t: u32,
     // 请求次数
@@ -14,6 +15,7 @@ pub struct Args {
 impl Args {
     pub fn new() -> Self {
         Self {
+            crazy: false,
             t: 0,
             c: 1,  //默认
             n: 10, //默认
@@ -46,6 +48,10 @@ impl Args {
                         Err(_) => panic!("-t need number"),
                     }
                 }
+                "crazy" => {
+                    i += 1;
+                    self.crazy = true
+                }
                 _ => {
                     // 解析url
                     if self.url == "" {
@@ -69,6 +75,7 @@ impl Args {
             };
         }
         Self {
+            crazy: self.crazy,
             t: self.t,
             c: self.c,
             n: self.n,

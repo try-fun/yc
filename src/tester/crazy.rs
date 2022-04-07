@@ -1,21 +1,24 @@
 use crate::libs::tools::pretty;
 use reqwest::{Client, Url};
+use std::error::Error;
 use std::time;
 use tokio::sync::mpsc;
 use tokio::task;
 
 //  疯狂模式
-pub async fn run(t: u64, url: &str) {
-    let now = time::Instant::now();
-    let client = Client::new();
-    let (tx, rx) = mpsc::channel(100);
+pub async fn run(t: u64, url: &str) -> Result<(), Box<dyn Error>> {
+    let client = Client::builder()
+        .timeout(time::Duration::from_secs(10))
+        .build()?;
+    let (tx, rx) = mpsc::channel(1000);
     let u = url.to_string();
     let t1 = task::spawn(async move {
         format(t, u, rx).await;
     });
 
     for i in 0.. {
-        if now.elapsed().as_secs() >= t {
+        // 单机6万
+        if i >= 60000 {
             println!("发送总数: {}", i);
             break;
         }
@@ -45,6 +48,7 @@ pub async fn run(t: u64, url: &str) {
                     }
                 }
                 Err(_e) => {
+                    println!("{}", _e);
                     if let Err(e) = tx_x.send((400, 0u128, 0)).await {
                         panic!("{}", e);
                     }
@@ -55,6 +59,7 @@ pub async fn run(t: u64, url: &str) {
     drop(tx);
 
     if let Ok(_) = t1.await {}
+    Ok(())
 }
 
 pub async fn format(t: u64, url: String, mut rx: mpsc::Receiver<(u32, u128, usize)>) {
@@ -83,14 +88,14 @@ pub async fn format(t: u64, url: String, mut rx: mpsc::Receiver<(u32, u128, usiz
 
     // 输出统计
     let stop = time::Instant::now();
-    let min = (stop - start).as_micros() as f64 / 1000000f64;
+    let used_min = (stop - start).as_micros() as f64 / 1000000f64;
     let sent_total = (ok_count + failed_count) as f64;
     let avg_time = (times.iter().sum::<u128>()
         / if sent_total == 0f64 { 1f64 } else { sent_total } as u128) as f32;
     let avg_size = (data_len / if sent_total == 0f64 { 1f64 } else { sent_total }) as f64;
 
     println!();
-    if min > 0f64 {
+    if used_min > 0f64 {
         println!(
             "   耗时: {:.2} s",
             ((stop - start).as_micros() as f64 / 1000000f64)
@@ -100,7 +105,7 @@ pub async fn format(t: u64, url: String, mut rx: mpsc::Receiver<(u32, u128, usiz
     };
     println!(
         "请求/秒: {:.2} 次/秒",
-        sent_total as f64 / if min == 0f64 { 1f64 } else { min }
+        sent_total as f64 / if used_min == 0f64 { 1f64 } else { used_min }
     );
 
     println!("   成功: {}", ok_count);

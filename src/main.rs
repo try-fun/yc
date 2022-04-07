@@ -12,10 +12,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    if args.t > 0 {
-        crazy::run(args.t as u64, url).await;
+    if args.crazy {
+        crazy::run(args.t as u64, url)
+            .await
+            .expect("crazy mode ERROR");
     } else {
-        comm::run(args.n as usize, args.c as usize, url).await;
+        comm::run(args.n as usize, args.c as usize, url)
+            .await
+            .expect("comm mode ERROR");
     }
 
     Ok(())
