@@ -111,8 +111,8 @@ pub async fn format(t: u64, url: String, mut rx: mpsc::Receiver<(u32, u128, usiz
     println!("   成功: {}", ok_count);
     println!("   失败: {}", failed_count);
     println!("   丢失: {}", missed_count);
-    println!("下载数据: {}", pretty::bytes(data_len as f64));
-    println!("数据/秒: {}", pretty::bytes(avg_size));
+    println!("下载数据: {}", pretty::bytes(data_len as u64));
+    println!("数据/秒: {}", pretty::bytes(avg_size as u64));
 
     println!(
         "最长耗时: {} ms",
