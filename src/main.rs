@@ -1,25 +1,48 @@
-use std::error::Error;
-use std::result::Result;
-use yc::libs::args::Args;
-use yc::tester::{comm, crazy};
+use clap;
+use clap::Parser;
+use yc::libs::tester;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about)]
+pub struct Args {
+    /// Number of requests
+    #[clap(short = 'n', long, value_parser, default_value_t = 100)]
+    pub requests: u32,
+
+    /// Number of multiple requests to make at a time
+    #[clap(short = 'c', long, value_parser, default_value_t = 1)]
+    pub concurrency: u32,
+
+    /// Wait for each response Default is 30 seconds
+    #[clap(short = 't', long, value_parser, default_value_t = 30)]
+    pub timeout: u64,
+
+    /// URL
+    #[clap(short = 'u', long, value_parser)]
+    pub url: String,
+}
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let args = Args::new().parse();
-    let url: &str = &args.url.clone()[..];
-    if url.trim() == "" {
-        println!("need url");
-        return Ok(());
+async fn main() -> Result<(), ()> {
+    let args = Args::parse();
+    let mut url = args.url;
+    if !url.contains("http") {
+        url = format!("http://{}", url);
     }
 
-    if args.crazy {
-        crazy::run(args.t as u64, url)
-            .await
-            .expect("crazy mode ERROR");
-    } else {
-        comm::run(args.n as usize, args.c as usize, url)
-            .await
-            .expect("comm mode ERROR");
+    let t = tester::run(
+        args.requests as usize,
+        args.concurrency as usize,
+        &url,
+        args.timeout,
+    )
+    .await;
+
+    match t {
+        Err(e) => {
+            println!("{}", e.to_string());
+        }
+        _ => {}
     }
 
     Ok(())

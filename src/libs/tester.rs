@@ -14,7 +14,17 @@ n: 请求次数
 # Examples
 
 */
-pub async fn run(n: usize, c: usize, url: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    n: usize,
+    c: usize,
+    url: &str,
+    timeout: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let url_ok = Url::parse(url);
+    if let Err(x) = url_ok {
+        return Err(Box::new(x));
+    }
+
     // 初始化channle
     let (tx, rx) = mpsc::channel(10);
 
@@ -26,16 +36,15 @@ pub async fn run(n: usize, c: usize, url: &str) -> Result<(), Box<dyn std::error
 
     // 创建任务
     let client = Client::builder()
-        .timeout(time::Duration::from_secs(9))
+        .timeout(time::Duration::from_secs(timeout))
         .build()?;
-    let reqs = vec![url; n];
+    let reqs = vec![url_ok.unwrap(); n];
 
     let tasks = stream::iter(reqs)
         .map(|url| {
             let client = &client;
             async move {
                 let start = time::Instant::now();
-                let url = Url::parse(url).unwrap();
                 let resp = client.get(url).send().await?;
                 resp.bytes().await.map(|byte| (start, byte))
             }
