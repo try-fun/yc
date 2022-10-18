@@ -20,11 +20,7 @@ pub async fn run(
     url: &str,
     timeout: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let url_ok = Url::parse(url);
-    if let Err(x) = url_ok {
-        return Err(Box::new(x));
-    }
-
+    let url = Url::parse(url).unwrap();
     // 初始化channle
     let (tx, rx) = mpsc::channel(10);
 
@@ -35,19 +31,16 @@ pub async fn run(
     });
 
     // 创建任务
-    let client = Client::builder()
-        .timeout(time::Duration::from_secs(timeout))
-        .build()?;
-    let reqs = vec![url_ok.unwrap(); n];
-
+    let reqs = vec![url; n];
     let tasks = stream::iter(reqs)
-        .map(|url| {
-            let client = &client;
-            async move {
-                let start = time::Instant::now();
-                let resp = client.get(url).send().await?;
-                resp.bytes().await.map(|byte| (start, byte))
-            }
+        .map(|url| async move {
+            let client = Client::builder()
+                .timeout(time::Duration::from_secs(timeout))
+                .build()
+                .unwrap();
+            let start = time::Instant::now();
+            let resp = client.get(url).send().await?;
+            resp.bytes().await.map(|byte| (start, byte))
         })
         .buffer_unordered(c);
 
@@ -88,7 +81,7 @@ pub async fn format(n: usize, c: usize, url: String, mut rx: mpsc::Receiver<(u32
     let mut ok_count = 0; //成功数
     let mut failed_count = 0; //失败数
     let mut data_len = 0f64; //数据长度 bytes
-    let mut times: Vec<u128> = Vec::with_capacity(10);
+    let mut times: Vec<u128> = Vec::with_capacity(n);
     let pb = ProgressBar::new(n as u64); // 进度条
 
     while let Some(x) = rx.recv().await {
